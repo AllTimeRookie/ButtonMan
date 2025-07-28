@@ -25,7 +25,7 @@ function joinRoom() {
   }
   
   updateConnectionStatus('connecting');
-  socket = new WebSocket('ws://localhost:3000');
+  socket = new WebSocket('https://buttonman.onrender.com');
 
   socket.onopen = () => {
     socket.send(JSON.stringify({ type: "join", room }));
