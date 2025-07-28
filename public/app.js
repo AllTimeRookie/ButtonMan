@@ -64,11 +64,12 @@ function initPeer(isCaller, room) {
 
   peer.ondatachannel = e => {
     dataChannel = e.channel;
+    dataChannel.bufferedAmountLowThreshold = 0;
     setupChannel();
   };
 
   if (isCaller) {
-    dataChannel = peer.createDataChannel("chat");
+    dataChannel = peer.createDataChannel("chat", { bufferedAmountLowThreshold: 0 });
     setupChannel();
     peer.createOffer().then(offer => {
       peer.setLocalDescription(offer);
@@ -187,11 +188,23 @@ async function sendFile() {
   while (offset < file.size) {
     const slice = file.slice(offset, offset + CHUNK_SIZE);
     await new Promise(resolve => {
-      dataChannel.send(slice);
-      offset += slice.byteLength;
-      const progress = (offset / file.size) * 100;
-      progressBar.style.width = `${progress}%`;
-      setTimeout(resolve, 10); // Small delay to prevent overwhelming the data channel
+      // Implement backpressure to prevent overwhelming the data channel
+      const sendNextChunk = () => {
+        if (dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold) {
+          // If buffer is full, wait for 'bufferedamountlow' event
+          dataChannel.onbufferedamountlow = () => {
+            dataChannel.onbufferedamountlow = null;
+            sendNextChunk();
+          };
+        } else {
+          dataChannel.send(slice);
+          offset += slice.byteLength;
+          const progress = (offset / file.size) * 100;
+          progressBar.style.width = `${progress}%`;
+          resolve();
+        }
+      };
+      sendNextChunk();
     });
   }
 
