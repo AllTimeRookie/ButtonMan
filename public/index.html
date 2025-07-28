@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>P2P Chat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <h2>ButtonMan</h2>
+      <p class="app-subtitle">Secure P2P Chat</p>
+    </header>
+    
+    <div class="connection-controls">
+      <input id="room" placeholder="Enter Room ID" />
+      <div class="button-group">
+        <button onclick="joinRoom()">Create/Join Room</button>
+        <button onclick="disconnect()">Disconnect</button>
+      </div>
+      <div class="status-container">
+        <span class="status-indicator status-disconnected" id="status-indicator"></span>
+        <span class="status-text" id="status-text">Disconnected</span>
+      </div>
+    </div>
+    <hr />
+  <textarea id="chat" cols="50" rows="10" readonly></textarea>
+  <div class="message-container">
+    <input id="message" placeholder="Your message..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+  <div class="file-transfer-container">
+    <input type="file" id="fileInput" />
+    <button onclick="sendFile()">Send File</button>
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+    <footer class="app-footer">
+      <p>&copy; 2025 ButtonMan - Secure P2P Chat</p>
+    </footer>
+  </div><!-- Close app-container -->
+  <script src="app.js"></script>
+</body>
+</html>
