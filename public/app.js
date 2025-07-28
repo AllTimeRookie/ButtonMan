@@ -11,7 +11,7 @@ let receivedFileName = '';
 let receivedFileSize = 0;
 let receivedBytes = 0;
 
-const CHUNK_SIZE = 16 * 1024; // 16KB chunks
+const CHUNK_SIZE = 64 * 1024; // 64KB chunks
 
 // Set initial status
 updateConnectionStatus('disconnected');
@@ -65,11 +65,13 @@ function initPeer(isCaller, room) {
   peer.ondatachannel = e => {
     dataChannel = e.channel;
     dataChannel.bufferedAmountLowThreshold = 0;
+    dataChannel.binaryType = "arraybuffer";
     setupChannel();
   };
 
   if (isCaller) {
     dataChannel = peer.createDataChannel("chat", { bufferedAmountLowThreshold: 0 });
+    dataChannel.binaryType = "arraybuffer";
     setupChannel();
     peer.createOffer().then(offer => {
       peer.setLocalDescription(offer);
