@@ -97,6 +97,8 @@ async function handleOffer({ offer }) {
 }
 
 function setupChannel() {
+  let isReceivingSingleBlobFile = false;
+  
   dataChannel.onmessage = async e => {
     const peerTimestamp = new Date().toLocaleString();
     if (typeof e.data === 'string') {
@@ -108,8 +110,9 @@ function setupChannel() {
           receivedFile = [];
           receivedBytes = 0;
           progressBar.style.width = '0%';
-          chatBox.value += `Peer: [${peerTimestamp}] Receiving file: ${receivedFileName} (${(receivedFileSize / (1024 * 1024)).toFixed(2)} MB)\n`;
-          console.log(`[Receiver] Received file-start: ${msg.name}, size: ${msg.size}`);
+          isReceivingSingleBlobFile = receivedFileSize <= (100 * 1024 * 1024);
+          chatBox.value += `Peer: [${peerTimestamp}] Receiving file: ${receivedFileName} (${(receivedFileSize / (1024 * 1024)).toFixed(2)} MB) ${isReceivingSingleBlobFile ? '[Single Blob]' : '[Chunked]'}\n`;
+          console.log(`[Receiver] Received file-start: ${msg.name}, size: ${msg.size}, singleBlob: ${isReceivingSingleBlobFile}`);
         } else if (msg.type === 'file-end') {
           const blob = new Blob(receivedFile);
           const url = URL.createObjectURL(blob);
@@ -122,6 +125,7 @@ function setupChannel() {
           URL.revokeObjectURL(url);
           chatBox.value += `Peer: [${peerTimestamp}] File received: ${receivedFileName}\n`;
           progressBar.style.width = '0%';
+          isReceivingSingleBlobFile = false;
           console.log(`[Receiver] Received file-end: ${receivedFileName}`);
         } else {
           chatBox.value += `Peer: [${peerTimestamp}] ${e.data}\n`;
@@ -130,14 +134,23 @@ function setupChannel() {
         chatBox.value += `Peer: [${peerTimestamp}] ${e.data}\n`;
       }
     } else {
-      receivedFile.push(e.data);
-      receivedBytes += e.data.byteLength;
-      const progress = (receivedBytes / receivedFileSize) * 100;
-      // Update progress bar and chatbox less frequently
-      if (progress - parseFloat(progressBar.style.width) >= 1 || receivedBytes === receivedFileSize) {
+      if (isReceivingSingleBlobFile) {
+        receivedFile.push(e.data);
+        receivedBytes = e.data.byteLength;
+        const progress = (receivedBytes / receivedFileSize) * 100;
         progressBar.style.width = `${progress}%`;
-        chatBox.value += `Peer: [${peerTimestamp}] Receiving file chunk... ${progress.toFixed(2)}%\n`;
-        console.log(`[Receiver] Received chunk of size: ${e.data.byteLength}, total received: ${receivedBytes}/${receivedFileSize}`);
+        chatBox.value += `Peer: [${peerTimestamp}] Receiving file: ${receivedFileName} (Single Blob) ${progress.toFixed(2)}%\n`;
+        console.log(`[Receiver] Received single blob of size: ${e.data.byteLength}`);
+      } else {
+        receivedFile.push(e.data);
+        receivedBytes += e.data.byteLength;
+        const progress = (receivedBytes / receivedFileSize) * 100;
+        // Update progress bar and chatbox less frequently
+        if (progress - parseFloat(progressBar.style.width) >= 1 || receivedBytes === receivedFileSize) {
+          progressBar.style.width = `${progress}%`;
+          chatBox.value += `Peer: [${peerTimestamp}] Receiving file chunk... ${progress.toFixed(2)}%\n`;
+          console.log(`[Receiver] Received chunk of size: ${e.data.byteLength}, total received: ${receivedBytes}/${receivedFileSize}`);
+        }
       }
     }
     chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to bottom
@@ -194,24 +207,35 @@ async function sendFile() {
   dataChannel.send(fileStartMsg);
   console.log(`[Sender] Sent file-start: ${fileStartMsg}`);
 
-  let offset = 0;
-  while (offset < file.size) {
-    const slice = file.slice(offset, offset + CHUNK_SIZE);
-    await new Promise(resolve => {
-      if (dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold) {
-        dataChannel.onbufferedamountlow = () => {
-          dataChannel.onbufferedamountlow = null;
-          resolve();
-        };
-      } else {
-        resolve();
-      }
-    });
-    dataChannel.send(slice);
-    console.log(`[Sender] Sent chunk of size: ${slice.byteLength}, total sent: ${offset + slice.byteLength}/${file.size}`);
-    offset += slice.byteLength;
-    const progress = (offset / file.size) * 100;
+  const MAX_FILE_SIZE_FOR_SINGLE_SEND = 100 * 1024 * 1024; // 100 MB
+
+  if (file.size <= MAX_FILE_SIZE_FOR_SINGLE_SEND) {
+    // Send as a single blob if file is small enough
+    dataChannel.send(file);
+    console.log(`[Sender] Sent file as single blob: ${file.name}, size: ${file.size}`);
+    const progress = 100;
     progressBar.style.width = `${progress}%`;
+  } else {
+    // Use chunking for larger files
+    let offset = 0;
+    while (offset < file.size) {
+      const slice = file.slice(offset, offset + CHUNK_SIZE);
+      await new Promise(resolve => {
+        if (dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold) {
+          dataChannel.onbufferedamountlow = () => {
+            dataChannel.onbufferedamountlow = null;
+            resolve();
+          };
+        } else {
+          resolve();
+        }
+      });
+      dataChannel.send(slice);
+      console.log(`[Sender] Sent chunk of size: ${slice.byteLength}, total sent: ${offset + slice.byteLength}/${file.size}`);
+      offset += slice.byteLength;
+      const progress = (offset / file.size) * 100;
+      progressBar.style.width = `${progress}%`;
+    }
   }
 
   const fileEndMsg = JSON.stringify({ type: 'file-end' });
@@ -219,6 +243,7 @@ async function sendFile() {
   console.log(`[Sender] Sent file-end: ${fileEndMsg}`);
   chatBox.value += `You: File sent: ${file.name}\n`;
   progressBar.style.width = '0%';
+
 
 }
 
