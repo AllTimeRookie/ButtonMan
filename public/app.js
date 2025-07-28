@@ -109,6 +109,7 @@ function setupChannel() {
           receivedBytes = 0;
           progressBar.style.width = '0%';
           chatBox.value += `Peer: [${peerTimestamp}] Receiving file: ${receivedFileName} (${(receivedFileSize / (1024 * 1024)).toFixed(2)} MB)\n`;
+          console.log(`[Receiver] Received file-start: ${msg.name}, size: ${msg.size}`);
         } else if (msg.type === 'file-end') {
           const blob = new Blob(receivedFile);
           const url = URL.createObjectURL(blob);
@@ -121,6 +122,7 @@ function setupChannel() {
           URL.revokeObjectURL(url);
           chatBox.value += `Peer: [${peerTimestamp}] File received: ${receivedFileName}\n`;
           progressBar.style.width = '0%';
+          console.log(`[Receiver] Received file-end: ${receivedFileName}`);
         } else {
           chatBox.value += `Peer: [${peerTimestamp}] ${e.data}\n`;
         }
@@ -131,8 +133,12 @@ function setupChannel() {
       receivedFile.push(e.data);
       receivedBytes += e.data.byteLength;
       const progress = (receivedBytes / receivedFileSize) * 100;
-      progressBar.style.width = `${progress}%`;
-      chatBox.value += `Peer: [${peerTimestamp}] Receiving file chunk... ${progress.toFixed(2)}%\n`;
+      // Update progress bar and chatbox less frequently
+      if (progress - parseFloat(progressBar.style.width) >= 1 || receivedBytes === receivedFileSize) {
+        progressBar.style.width = `${progress}%`;
+        chatBox.value += `Peer: [${peerTimestamp}] Receiving file chunk... ${progress.toFixed(2)}%\n`;
+        console.log(`[Receiver] Received chunk of size: ${e.data.byteLength}, total received: ${receivedBytes}/${receivedFileSize}`);
+      }
     }
     chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to bottom
   };
@@ -180,39 +186,40 @@ async function sendFile() {
   }
 
   chatBox.value += `You: Sending file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)\n`;
-  dataChannel.send(JSON.stringify({
+  const fileStartMsg = JSON.stringify({
     type: 'file-start',
     name: file.name,
     size: file.size
-  }));
+  });
+  dataChannel.send(fileStartMsg);
+  console.log(`[Sender] Sent file-start: ${fileStartMsg}`);
 
   let offset = 0;
   while (offset < file.size) {
     const slice = file.slice(offset, offset + CHUNK_SIZE);
     await new Promise(resolve => {
-      // Implement backpressure to prevent overwhelming the data channel
-      const sendNextChunk = () => {
-        if (dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold) {
-          // If buffer is full, wait for 'bufferedamountlow' event
-          dataChannel.onbufferedamountlow = () => {
-            dataChannel.onbufferedamountlow = null;
-            sendNextChunk();
-          };
-        } else {
-          dataChannel.send(slice);
-          offset += slice.byteLength;
-          const progress = (offset / file.size) * 100;
-          progressBar.style.width = `${progress}%`;
+      if (dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold) {
+        dataChannel.onbufferedamountlow = () => {
+          dataChannel.onbufferedamountlow = null;
           resolve();
-        }
-      };
-      sendNextChunk();
+        };
+      } else {
+        resolve();
+      }
     });
+    dataChannel.send(slice);
+    console.log(`[Sender] Sent chunk of size: ${slice.byteLength}, total sent: ${offset + slice.byteLength}/${file.size}`);
+    offset += slice.byteLength;
+    const progress = (offset / file.size) * 100;
+    progressBar.style.width = `${progress}%`;
   }
 
-  dataChannel.send(JSON.stringify({ type: 'file-end' }));
+  const fileEndMsg = JSON.stringify({ type: 'file-end' });
+  dataChannel.send(fileEndMsg);
+  console.log(`[Sender] Sent file-end: ${fileEndMsg}`);
   chatBox.value += `You: File sent: ${file.name}\n`;
   progressBar.style.width = '0%';
+
 }
 
 function disconnect() {
