@@ -1,16 +1,13 @@
 {
   "name": "buttonman",
   "version": "1.0.0",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "privatine": true,
+  "main": "",
+  "scripts": {},
   "keywords": [],
   "author": "Md. Shefayet Hossain",
+  "contributors": ["SK. Yeasin Ahsanullah Al Galib <syaagalib@gmail.com>"],
   "license": "ISC",
   "description": "",
-  "dependencies": {
-    "express": "^5.1.0",
-    "ws": "^8.18.3"
-  }
+  "dependencies": {}
 }

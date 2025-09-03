@@ -1,0 +1,25 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run FastAPI server",
+			"type": "shell",
+			"command": "python app.py",
+			"args": [],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run FastAPI server",
+			"type": "shell",
+			"command": "/home/galib/ButtonMan/.venv/bin/python",
+			"args": [
+				"app.py"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
