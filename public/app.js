@@ -5,7 +5,10 @@ const chatBox = document.getElementById("chat");
 const messageInput = document.getElementById("message");
 const fileInput = document.getElementById("fileInput");
 
-const socket = new WebSocket(location.origin.replace(/^http/, "ws"));
+// Connect to Python FastAPI websocket endpoint at /ws
+const socket = new WebSocket(
+  (location.origin.replace(/^http/, "ws")) + "/ws"
+);
 let peerConnection, dataChannel;
 let roomId;
 let chatHistory = []; // To store chat messages for CSV export
